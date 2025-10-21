@@ -1,0 +1,12 @@
+main:
+  notebooks:
+    - "notebooks/01_data_exploration.ipynb"
+    # add more as needed
+  timeout: 600 
+
+exploration:
+    raw_csv: "data/raw/IMDB_Dataset.csv"
+    save_fig: True
+    fig_save_dir: "../results/figures/"
+    result_file_name: "IMDB_explored.csv"
+    result_save_dir: "../data/interim/"
