@@ -1,12 +1,64 @@
 main:
   notebooks:
     - "notebooks/01_data_exploration.ipynb"
+    - "notebooks/02_preprocessing.ipynb"
     # add more as needed
-  timeout: 600 
+  timeout: None
 
 exploration:
     raw_csv: "data/raw/IMDB_Dataset.csv"
     save_fig: True
-    fig_save_dir: "../results/figures/"
+    fig_save_dir: "results/figures/"
     result_file_name: "IMDB_explored.csv"
-    result_save_dir: "../data/interim/"
+    result_save_dir: "data/interim/"
+
+preprocessing:
+    # -----------------------------
+    # PATHS
+    # -----------------------------
+    paths:
+        raw_data: "data/raw/IMDB_Dataset.csv"            # Original Kaggle dataset
+        interim_data: "data/interim/IMDB_explored.csv"   # After exploration (word/char stats added)
+        cleaned_data: "data/interim/IMDB_cleaned.csv"    # After full cleaning (format csv, pkl) change the format if not csv
+        processed_data: "data/processed/"                # For train/test splits or embeddings
+        models: "models/"                                # (Reserved) for saved models later
+    
+    # -----------------------------
+    # TEXT CLEANING SETTINGS
+    # -----------------------------
+    cleaning:
+        lowercase: True                # Convert all text to lowercase for consistency
+        strip_html: True               # Remove any HTML tags (e.g., <br />, <p>)
+        remove_urls: True              # Remove URLs like "http://..." or "www..."
+        remove_emails: True            # Remove email addresses (e.g., user@example.com)
+        remove_punctuation: True       # Remove all punctuation characters
+        remove_numbers: False          # If true, remove numeric tokens (e.g., 2023, 10)
+        remove_control_chars: True     # Remove \n, \t, \r
+        remove_emoji: True             # Remove or demojize emoji (e.g., 😍 -> ":smiling_face_with_heart_eyes:")
+        normalize_unicode: True        # Normalize Unicode text (e.g., accents → standard ASCII)
+        expand_contractions: True      # Expand contractions (e.g., "don't" → "do not")
+        replace_whitespace: True       # Collapse multiple spaces/newlines/tabs into a single space
+        normalize_elongations: True    # Reduce long character repeats (e.g., "soooo" → "soo")
+        remove_stopwords: True         # Remove English stopwords using NLTK
+        lemmatize: True                # Lemmatize words (e.g., "running" → "run")
+        stem: False                    # (Optional, not used yet) Apply stemming instead of lemmatization
+        alpha_only: True               # Keep only alphabetic tokens (discard digits, symbols)
+        min_token_length: 2            # Minimum token length to retain (e.g., drop 'a', 'I')
+    
+    # -----------------------------
+    # STOPWORDS CONTROL
+    # -----------------------------
+    stopwords:
+        source: "nltk"                 # Source for stopword list: "nltk" or "custom"
+        add_custom: []                 # Add extra words to remove (e.g., ["movie", "film"])
+        remove_custom: []              # Words to keep even if they're in the stopword list
+    
+    # -----------------------------
+    # INTERMEDIATE OUTPUT CONTROL
+    # -----------------------------
+    intermediate:
+        save_fig: True                 # Save the figures generated
+        fig_dir: "results/figures/"    # Folder to save the figs in
+        format: "csv"                  # Save format for intermediate results
+        sample_rows_to_check: 10       # Sample few rows after cleaning to verify transformations
+
