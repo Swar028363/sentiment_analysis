@@ -1,7 +1,8 @@
 main:
   notebooks:
-    - "notebooks/01_data_exploration.ipynb"
-    - "notebooks/02_preprocessing.ipynb"
+    #- "notebooks/01_data_exploration.ipynb"
+    #- "notebooks/02_preprocessing.ipynb"
+    - "notebooks/03_feature_engineering.ipynb"
     # add more as needed
   timeout: None
 
@@ -19,7 +20,7 @@ preprocessing:
     paths:
         raw_data: "data/raw/IMDB_Dataset.csv"            # Original Kaggle dataset
         interim_data: "data/interim/IMDB_explored.csv"   # After exploration (word/char stats added)
-        cleaned_data: "data/interim/IMDB_cleaned.csv"    # After full cleaning (format csv, pkl) change the format if not csv
+        cleaned_data: "data/interim/IMDB_cleaned.pkl"    # After full cleaning (format csv, pkl) change the format if not csv
         processed_data: "data/processed/"                # For train/test splits or embeddings
         models: "models/"                                # (Reserved) for saved models later
     
@@ -59,6 +60,54 @@ preprocessing:
     intermediate:
         save_fig: True                 # Save the figures generated
         fig_dir: "results/figures/"    # Folder to save the figs in
-        format: "csv"                  # Save format for intermediate results
+        format: "pkl"                  # Save format for intermediate results
         sample_rows_to_check: 10       # Sample few rows after cleaning to verify transformations
+
+feature_engineering: ## keep the file formats same or everything will break
+    # ===== General settings =====
+    use_gpu: true                    # Use GPU if available for embeddings
+    random_seed: 42                  # Reproducibility
+    save_after_each_stage: true      # Save TF-IDF, Word2Vec, etc. after creation
+    format: "pkl"                    # or "npz" for sparse matrices
+    cleaned_data: "data/interim/IMDB_cleaned.pkl"
+    save_df_path: "data/interim/IMDB_feature_engineered.pkl"
+    
+    label_encoder:
+        save_path: "data/interim/label_encoder.pkl"
+        
+    count_vectorizer:
+        encoding: "utf-8"                     # Character encoding (e.g., 'latin1' for non-UTF files)
+        decode_error: "strict"                # How to handle decode errors: 'strict', 'ignore', or 'replace'
+        strip_accents: None                   # 'ascii'/'unicode' removes accents (e.g., “café”→“cafe”)
+        ngram_range: (1, 3)                   # Use unigrams only; (1,2) for unigrams + bigrams, etc.
+        analyzer: "word"                      # 'word' (default), 'char', or 'char_wb' for character n-grams
+        max_df: 0.9                           # Ignore terms in >X% of docs (e.g., 0.9 removes common words)
+        min_df: 2                             # Ignore terms in <X docs (e.g., 2 removes rare words)
+        max_features: 80000                   # Limit vocab size to top N most frequent tokens
+        vocabulary: None                      # Fixed vocabulary dict/list if you already know the terms
+        binary: False                         # If True, record presence (1/0) instead of counts
+        save_vectorizer_path: "data/interim/count_vectorizer.pkl"
+        save_matrix_path: "data/interim/count_vectorized_reviwes.npz"
+
+    
+    # ===== TF-IDF Vectorization =====
+    tfidf_vectorizer:
+        encoding: "utf-8"                     # Character encoding (e.g., 'latin1' for some older corpora)
+        decode_error: "strict"                # How to handle decode errors: 'strict', 'ignore', or 'replace'
+        strip_accents: None                   # 'ascii'/'unicode' removes accents (“café”→“cafe”)
+        analyzer: "word"                      # 'word' (default), 'char', or 'char_wb' (within word boundaries)
+        ngram_range: (1, 3)                   # Use unigrams only; (1,2) for unigrams + bigrams, etc.
+        max_df: 0.9                           # Ignore terms in >X% of docs (e.g., 0.9 removes very common words)
+        min_df: 2                             # Ignore terms in <X docs (e.g., 2 removes very rare words)
+        max_features: 80000                   # Keep only the top N features by frequency
+        vocabulary: None                      # Fixed vocab list/dict (useful for applying same vocab later)
+        binary: False                         # If True, use 1/0 instead of term frequency before TF-IDF scaling
+        norm: "l2"                            # Normalize vectors: 'l1', 'l2', or None (no normalization)
+        use_idf: True                         # Enable inverse document frequency weighting
+        smooth_idf: True                      # Adds 1 to document frequencies to avoid div-by-zero
+        sublinear_tf: True                    # If True, use log(1 + tf) for term frequency scaling
+        save_vectorizer_path: "data/interim/tfidf_vectorizer.pkl"
+        save_matrix_path: "data/interim/tfidf_vectorized_reviwes.npz"
+    
+
 
