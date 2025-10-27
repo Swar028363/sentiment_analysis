@@ -1,9 +1,9 @@
 main:
   notebooks:
-    - "notebooks/01_data_exploration.ipynb"
-    - "notebooks/02_preprocessing.ipynb"
-    - "notebooks/03_feature_engineering.ipynb"
-    #- "notebooks/04_sentiment_modeling.ipynb"
+    #- "notebooks/01_data_exploration.ipynb"
+    #- "notebooks/02_preprocessing.ipynb"
+    #- "notebooks/03_feature_engineering.ipynb"
+    - "notebooks/04_sentiment_modeling.ipynb"
     # add more as needed
   timeout: None
 
@@ -69,6 +69,7 @@ feature_engineering: ## keep the file formats same or everything will break
     use_gpu: true                    # Use GPU if available for embeddings
     random_seed: 42                  # Reproducibility
     save_after_each_stage: true      # Save TF-IDF, Word2Vec, etc. after creation
+    save_figure: True                # Save Plot or
     format: "pkl"                    # or "npz" for sparse matrices
     cleaned_data: "data/interim/IMDB_cleaned.pkl"
     save_df_path: "data/interim/IMDB_feature_engineered.pkl"
@@ -77,6 +78,7 @@ feature_engineering: ## keep the file formats same or everything will break
         save_path: "models/label_encoder.pkl"
         
     count_vectorizer:
+        generate_count: False                 # True if you want to generate and save count Vectors
         encoding: "utf-8"                     # Character encoding (e.g., 'latin1' for non-UTF files)
         decode_error: "strict"                # How to handle decode errors: 'strict', 'ignore', or 'replace'
         strip_accents: None                   # 'ascii'/'unicode' removes accents (e.g., “café”→“cafe”)
@@ -93,6 +95,7 @@ feature_engineering: ## keep the file formats same or everything will break
     
     # ===== TF-IDF Vectorization =====
     tfidf_vectorizer:
+        generate_tfidf: False                 # True if you want to generate and save tfidf vectors
         encoding: "utf-8"                     # Character encoding (e.g., 'latin1' for some older corpora)
         decode_error: "strict"                # How to handle decode errors: 'strict', 'ignore', or 'replace'
         strip_accents: None                   # 'ascii'/'unicode' removes accents (“café”→“cafe”)
@@ -110,5 +113,34 @@ feature_engineering: ## keep the file formats same or everything will break
         save_vectorizer_path: "models/tfidf_vectorizer.pkl"
         save_matrix_path: "data/interim/tfidf_vectorized_reviwes.npz"
     
+    w2v:
+        w2v: True
+        vector_size: 300
+        window: 12
+        min_count: 5
+        sg: 1
+        epochs: 12
+        workers: -1
+        pooling: "mean" 
+        pooling_batch_size: 4096
+        model_save_path: "models/w2v.model"
+        embeddings_save_path: "data/interim/w2v_review_vecs.npy"
+        fig_words: 100
+        plot_3d: True
+        save_fig_path: "results/figures/w2v_tsne_plot.png"
 
-
+    fast_text:
+        fast_text: True
+        vector_size: 300
+        window: 12
+        min_count: 5
+        sg: 1
+        epochs: 12
+        workers: -1
+        pooling: "mean" 
+        pooling_batch_size: 4096
+        model_save_path: "models/fasttext.model"
+        embeddings_save_path: "data/interim/ft_review_vecs.npy"
+        fig_words: 100
+        plot_3d: True
+        save_fig_path: "results/figures/ft_tsne_plot.png"
