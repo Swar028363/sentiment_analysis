@@ -1,13 +1,15 @@
 import time
+import warnings
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import cross_validate
+from sklearn.model_selection import StratifiedKFold, KFold, train_test_split, cross_validate
+from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import (
     accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
 )
 
 # Map metric names to sklearn functions
-_METRIC_FUNCTIONS = {
+METRIC_FUNCTIONS = {
     "accuracy": accuracy_score,
     "precision": lambda y_true, y_pred: precision_score(y_true, y_pred, zero_division=0),
     "recall": lambda y_true, y_pred: recall_score(y_true, y_pred, zero_division=0),
@@ -21,7 +23,7 @@ def evaluate_metrics(y_true, y_pred, y_proba, metrics):
     results = {}
     for metric in metrics:
         metric = metric.lower()
-        func = _METRIC_FUNCTIONS.get(metric)
+        func = METRIC_FUNCTIONS.get(metric)
         if not func:
             raise ValueError(f"Unsupported metric: '{metric}'")
 
@@ -35,7 +37,19 @@ def evaluate_metrics(y_true, y_pred, y_proba, metrics):
             results[metric.capitalize()] = func(y_true, y_pred)
     return results
 
-
+def get_predictions_with_proba(model, X):
+    """Get predictions and probabilities from model."""
+    y_pred = model.predict(X)
+    
+    if hasattr(model, 'predict_proba'):
+        y_proba = model.predict_proba(X)[:, 1]
+    elif hasattr(model, 'decision_function'):
+        y_proba = model.decision_function(X)
+    else:
+        y_proba = None
+    
+    return y_pred, y_proba
+    
 def train_and_eval_models(
     data,
     models,
@@ -73,7 +87,7 @@ def train_and_eval_models(
             X, y = data
 
             # Convert custom metrics into sklearn-compatible scoring names
-            scoring = {m: m for m in scoring_metrics if m in _METRIC_FUNCTIONS.keys()}
+            scoring = {m: m for m in scoring_metrics if m in METRIC_FUNCTIONS.keys()}
 
             scores = cross_validate(
                 estimator=model,
@@ -107,18 +121,9 @@ def train_and_eval_models(
             fit_time = time.time() - start_time
 
             # Predictions
-            y_train_pred = model.predict(X_train)
-            y_test_pred = model.predict(X_test)
-
-            # Probabilities or decision scores
-            if hasattr(model, "predict_proba"):
-                y_train_proba = model.predict_proba(X_train)[:, 1]
-                y_test_proba = model.predict_proba(X_test)[:, 1]
-            elif hasattr(model, "decision_function"):
-                y_train_proba = model.decision_function(X_train)
-                y_test_proba = model.decision_function(X_test)
-            else:
-                y_train_proba = y_test_proba = None
+            y_train_pred, y_train_proba = get_predictions_with_proba(model, X_train)
+            y_test_pred, y_test_proba = get_predictions_with_proba(model, X_test)
+            
 
             model_data = {"Model": name, "Fit_Time_sec": fit_time}
 
@@ -139,3 +144,23 @@ def train_and_eval_models(
     print("\nEvaluation Complete.")
 
     return models, df
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
