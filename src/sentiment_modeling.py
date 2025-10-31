@@ -1,22 +1,19 @@
+import os
 import time
 import warnings
+
 import numpy as np
 import pandas as pd
+
+import seaborn as sns
+import matplotlib.pyplot as plt 
+
 from sklearn.model_selection import StratifiedKFold, KFold, train_test_split, cross_validate
-from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import (
-    accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
-)
+from sklearn.preprocessing import label_binarize
+from sklearn.base import clone
+from sklearn.metrics import *
 
-# Map metric names to sklearn functions
-METRIC_FUNCTIONS = {
-    "accuracy": accuracy_score,
-    "precision": lambda y_true, y_pred: precision_score(y_true, y_pred, zero_division=0),
-    "recall": lambda y_true, y_pred: recall_score(y_true, y_pred, zero_division=0),
-    "f1": lambda y_true, y_pred: f1_score(y_true, y_pred, zero_division=0),
-    "roc_auc": lambda y_true, y_proba: roc_auc_score(y_true, y_proba),
-}
-
+from .models_and_metrics import METRIC_FUNCTIONS
 
 def evaluate_metrics(y_true, y_pred, y_proba, metrics):
     """Dynamically evaluate any combination of metrics."""
@@ -36,6 +33,7 @@ def evaluate_metrics(y_true, y_pred, y_proba, metrics):
         else:
             results[metric.capitalize()] = func(y_true, y_pred)
     return results
+
 
 def get_predictions_with_proba(model, X):
     """Get predictions and probabilities from model."""
@@ -100,7 +98,7 @@ def train_and_eval_models(
             )
 
             model_data = {"Model": name}
-            model_data["Fit_Time_sec"] = np.mean(scores['fit_time'])
+            model_data["Fit_Time_sec"] = np.sum(scores['fit_time'])
 
             # Aggregate train/test results
             for data_type in ("Train", "Test"):
@@ -146,11 +144,121 @@ def train_and_eval_models(
     return models, df
 
 
+def combine_results(dfs, names):
+    """
+    Combine multiple model result DataFrames and tag each with embedding name.
+    """
+    combined = []
+    for df, name in zip(dfs, names):
+        df = df.copy()
+        df["Embedding"] = name
+        df["Model"] = df["Model"].astype(str) + f"{name}"
+        combined.append(df)
+    return pd.concat(combined, ignore_index=True)
+
+def combine_model_dicts(model_dicts, names=None, prefix=True):
+    combined = {}
+
+    for i, models in enumerate(model_dicts):
+        embed_name = names[i] if names and i < len(names) else f"Set{i+1}"
+
+        for model_name, model_obj in models.items():
+            if prefix:
+                new_name = f"{embed_name}{model_name}"
+            else:
+                new_name = f"{model_name}{embed_name}"
+
+            combined[new_name] = clone(model_obj)
+
+    return combined
 
 
+def find_best_models(df, scoring_func=None, top_n=5):
+    """
+    Evaluate and rank models across embeddings using all available metrics.
+    User can override the default scoring formula with scoring_func(df).
+    
+    Args:
+        df: Combined DataFrame with metrics
+        scoring_func: Optional custom scoring lambda or function
+        top_n: Number of top models to return
+    Returns:
+        Ranked DataFrame of best models
+    """
+    df = df.copy()
+
+    # Default comprehensive scoring formula using all metrics
+    if scoring_func is None:
+        # Normalize fit time (0-1 scale; lower = better)
+        df["Fit_Time_norm"] = (df["Fit_Time_sec"] - df["Fit_Time_sec"].min()) / (
+            df["Fit_Time_sec"].max() - df["Fit_Time_sec"].min()
+        )
+    
+        # --- Derived metrics ---
+        df["Overfit_Acc"] = abs(df["Train_Accuracy"] - df["Test_Accuracy"])
+        df["Overfit_F1"] = abs(df["Train_F1"] - df["Test_F1"])
+        df["Overfit_Precision"] = abs(df["Train_Precision"] - df["Test_Precision"])
+        df["Overfit_Recall"] = abs(df["Train_Recall"] - df["Test_Recall"])
+        df["Overfit_Roc"] = abs(df["Train_Roc_auc"] - df["Test_Roc_auc"])
+        df["PR_Balance"] = abs(df["Test_Precision"] - df["Test_Recall"])
+        
+        df["Overall_Score"] = (
+            # Performance
+            0.15 * df["Test_Accuracy"]
+            + 0.15 * df["Test_F1"]
+            + 0.15 * df["Test_Roc_auc"]
+            + 0.1 * df["Test_Precision"]
+            + 0.1 * df["Test_Recall"]
+
+            # Generalization (train-test consistency)
+            + 0.05 * (1 - df["Overfit_Acc"])
+            + 0.05 * (1 - df["Overfit_F1"])
+            + 0.05 * (1 - df["Overfit_Precision"])
+            + 0.05 * (1 - df["Overfit_Recall"])
+            + 0.05 * (1 - df["Overfit_Roc"])
+
+            # Stability and efficiency
+            + 0.05 * (1 - df["Fit_Time_norm"])
+            + 0.05 * (1 - df["PR_Balance"])
+        )
+    else:
+        # Allow user to supply custom scoring
+        df["Overall_Score"] = scoring_func(df)
+
+    # Sort by score
+    ranked = df.sort_values("Overall_Score", ascending=False).reset_index(drop=True)
+
+    return ranked.head(top_n)
 
 
+def plot_model_performance(df, metric="Overall_Score", fig_size=(14, 14), save_fig_path=""):
+    df_plot = df.sort_values(metric, ascending=False)
 
+    plt.figure(figsize=fig_size)
+    ax = sns.barplot(
+        data=df_plot,
+        x="Model",
+        y=metric,
+        hue="Embedding",
+    )
+    ax.set_xlabel(metric)
+    plt.xticks(rotation=-45)
+    ax.set_ylabel("Model")
+
+    ax.set_title(f"Model Performance by {metric}", fontsize=16, fontweight="bold", pad=15)
+
+    plt.legend(
+        title="Embedding",
+        bbox_to_anchor=(1.02, 1),
+    )
+    
+    for container in ax.containers:
+         ax.bar_label(container, fmt="%.3f")
+        
+    if save_fig_path != "":
+        plt.savefig(save_fig_path)
+        
+    plt.show()
 
 
 
