@@ -144,3 +144,22 @@ feature_engineering: ## keep the file formats same or everything will break
         fig_words: 100
         plot_3d: True
         save_fig_path: "results/figures/ft_tsne_plot.png"
+
+classical_models: # models in sklearn
+    df_path: "data/interim/IMDB_feature_engineered.pkl"
+    features: ["cleaned_review_charecter_len","cleaned_review_word_len","positive_tokens_len","negative_tokens_len"]
+    target: "sentiment"
+    
+    count_vectors_path: "data/interim/count_vectorized_reviwes.npz"
+    tfidf_vectors_path: "data/interim/tfidf_vectorized_reviwes.npz"
+    w2v_vectors_path: "data/interim/w2v_review_vecs.npy"
+    fast_text_vectors_path: "data/interim/ft_review_vecs.npy"
+    test_size: 0.2
+    
+    metrics_save_dir: "results/metrics/"
+    models_save_dir: "models/"
+    
+    train_without_cv: True
+    train_with_cv: False
+    
+    embeddings_to_use: ["numerical_cols"] #["numerical_cols", "count", "tfidf", "w2v", "fast_text"] any of these 4 that you generated before
