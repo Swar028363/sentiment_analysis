@@ -1,15 +1,22 @@
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler, RobustScaler
-from sklearn.model_selection import KFold, StratifiedKFold
+from copy import deepcopy
 
-from sklearn.linear_model import LogisticRegression, SGDClassifier
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
+from sklearn.linear_model import (
+    LogisticRegression, SGDClassifier, RidgeClassifier, PassiveAggressiveClassifier
+)
 from sklearn.svm import SVC, LinearSVC
 from sklearn.naive_bayes import MultinomialNB, ComplementNB, BernoulliNB
 from sklearn.ensemble import (
-    RandomForestClassifier, ExtraTreesClassifier, GradientBoostingClassifier, AdaBoostClassifier
+    RandomForestClassifier, ExtraTreesClassifier,
+    AdaBoostClassifier, GradientBoostingClassifier,
+    BaggingClassifier, StackingClassifier, VotingClassifier
 )
 from sklearn.neural_network import MLPClassifier
+from sklearn.neighbors import KNeighborsClassifier
 from sklearn.tree import DecisionTreeClassifier
+
+from sklearn.model_selection import KFold, StratifiedKFold
 from sklearn.metrics import (
     accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
 )
@@ -23,36 +30,129 @@ METRIC_FUNCTIONS = {
     "roc_auc": lambda y_true, y_proba: roc_auc_score(y_true, y_proba),
 }
 
+
+BASE_LEARNERS = [
+    # --- Linear Models (excellent for text data) ---
+    ('logreg', Pipeline([
+        ('scaler', StandardScaler(with_mean=False)),
+        ('clf', LogisticRegression(max_iter=1000, random_state=42))
+    ])),
+
+    ('sgd', Pipeline([
+        ('scaler', StandardScaler(with_mean=False)),
+        ('clf', SGDClassifier(loss='log_loss', max_iter=2000, random_state=42))
+    ])),
+
+    # --- Nonlinear Kernel Model ---
+    ('svc_rbf', Pipeline([
+        ('scaler', StandardScaler(with_mean=False)),
+        ('clf', SVC(kernel='rbf', probability=True, random_state=42))
+    ])),
+
+    # --- Probabilistic Baseline ---
+    ('bernoulli_nb', BernoulliNB()),
+
+    # --- Ensemble Trees (robust, interpretability) ---
+    ('rf', RandomForestClassifier(n_estimators=300, n_jobs=-1, random_state=42)),
+
+    # --- Neural Network (captures complex nonlinearities) ---
+    ('mlp', Pipeline([
+        ('scaler', StandardScaler(with_mean=False)),
+        ('clf', MLPClassifier(hidden_layer_sizes=(128, 64), max_iter=500, random_state=42))
+    ]))
+]
+
+
+# === Models ===
 MODELS = {
-    # --- Linear Models ---
-    "LogisticRegression": LogisticRegression(random_state=42, max_iter=1000, n_jobs=-1),
-    "SGDClassifier": SGDClassifier(random_state=42, max_iter=1000, tol=1e-3),
+    # --- Linear / probabilistic ---
+    "LogisticRegression": Pipeline([
+        ('scaler', StandardScaler()),
+        ('clf', LogisticRegression(max_iter=1000, random_state=42))
+    ]),
+    "SGDClassifier": Pipeline([
+        ('scaler', StandardScaler()),
+        ('clf', SGDClassifier(loss='log_loss', max_iter=2000, random_state=42))
+    ]),
+    "RidgeClassifier": Pipeline([
+        ('scaler', StandardScaler()),
+        ('clf', RidgeClassifier(random_state=42))
+    ]),
+    "PassiveAggressive": Pipeline([
+        ('scaler', StandardScaler()),
+        ('clf', PassiveAggressiveClassifier(max_iter=2000, random_state=42))
+    ]),
     
-    # --- SVMs ---
-    "LinearSVC": LinearSVC(random_state=42, max_iter=5000),
-    #"SVC_rbf": SVC(kernel="rbf", probability=True, random_state=42),
-    
-    # --- Naive Bayes (for count/tfidf only) ---
+    # --- SVM family ---
+    "LinearSVC": Pipeline([
+        ('scaler', StandardScaler()),
+        ('clf', LinearSVC(max_iter=5000, random_state=42))
+    ]),
+    "SVC_RBF": Pipeline([
+        ('scaler', StandardScaler()),
+        ('clf', SVC(kernel='rbf', random_state=42))
+    ]),
+
+    # --- Naive Bayes ---
     "MultinomialNB": MultinomialNB(),
     "ComplementNB": ComplementNB(),
     "BernoulliNB": BernoulliNB(),
-    
-    # --- Trees & Ensembles ---
-    "DecisionTreeClassifier": DecisionTreeClassifier(random_state=42),
-    "RandomForestClassifier": RandomForestClassifier(random_state=42, n_jobs=-1),
-    "ExtraTreesClassifier": ExtraTreesClassifier(random_state=42, n_jobs=-1),
-    "GradientBoostingClassifier": GradientBoostingClassifier(random_state=42),
-    "AdaBoostClassifier": AdaBoostClassifier(random_state=42),
-    
-    # --- Neural ---
-    "MLPClassifier": MLPClassifier(random_state=42, max_iter=300),
+
+    # --- Tree-based / Ensemble methods ---
+    "DecisionTree": DecisionTreeClassifier(random_state=42),
+    "RandomForest": RandomForestClassifier(n_estimators=300, n_jobs=-1, random_state=42),
+    "ExtraTrees": ExtraTreesClassifier(n_estimators=300, n_jobs=-1, random_state=42),
+    "AdaBoost": AdaBoostClassifier(random_state=42),
+    "GradientBoosting": GradientBoostingClassifier(random_state=42),
+    "Bagging(KNN)": BaggingClassifier(
+        estimator=KNeighborsClassifier(n_neighbors=7, n_jobs=-1),
+        n_estimators=25, random_state=42, n_jobs=-1
+    ),
+
+    # --- Neural Network ---
+    "MLP": Pipeline([
+        ('scaler', StandardScaler()),
+        ('clf', MLPClassifier(hidden_layer_sizes=(128, 64), max_iter=500, random_state=42))
+    ]),
+
+    # --- Instance-based ---
+    "KNN": Pipeline([
+        ('scaler', MinMaxScaler()),
+        ('clf', KNeighborsClassifier(n_neighbors=7, n_jobs=-1))
+    ]),
+
+    # --- Meta Models ---
+    "StackingClassifier": StackingClassifier(
+        estimators=BASE_LEARNERS,
+        final_estimator=LogisticRegression(max_iter=1000, random_state=42),
+        n_jobs=-1
+    ),
+    "VotingClassifier": VotingClassifier(
+        estimators=BASE_LEARNERS,
+        voting='soft',
+        n_jobs=-1
+    )
 }
 
 # Global incompatibility map
 INCOMPATIBLE_MODELS = {
-    "w2v": {"MultinomialNB", "ComplementNB"},
-    "fasttext": {"MultinomialNB", "ComplementNB"},
-    # Add more if needed later
+    # Dense embeddings (negative or continuous values)
+    "w2v": {
+        "MultinomialNB", "ComplementNB",  # NB fails on negative or continuous inputs
+    },
+    "fast_text": {
+        "MultinomialNB", "ComplementNB",  # same as above
+    },
+
+    # Sparse high-dimensional embeddings (TF-IDF, Count)
+    "tfidf": {
+        "KNN", "DecisionTree", "RandomForest", "ExtraTrees",
+        "GradientBoosting", "Bagging(LogReg)", "MLP",  # prone to overfit or fail
+    },
+    "count": {
+        "KNN", "DecisionTree", "RandomForest", "ExtraTrees",
+        "GradientBoosting", "Bagging(LogReg)", "MLP",
+    },
 }
 
 
@@ -64,17 +164,22 @@ SCORING_METRICS = [
 CV_STRATEGY = KFold(n_splits=5, shuffle=True, random_state=42)
 
 
-
-
 def copy_models(models, embedding_type=None):
     """
-    Returns a deep copy of the models dict.
-    Removes incompatible models automatically based on embedding_type.
+    Deep-copies the given models dict and removes incompatible models 
+    based on the embedding type.
     """
-    copied = {name: type(m)(**m.get_params()) for name, m in models.items()}
-    
+    # make an actual deep copy
+    copied = deepcopy(models)
+
+    # Drop incompatible models for this embedding type
     if embedding_type and embedding_type in INCOMPATIBLE_MODELS:
-        for bad_model in INCOMPATIBLE_MODELS[embedding_type]:
-            copied.pop(bad_model, None)
-    
+        bad_models = INCOMPATIBLE_MODELS[embedding_type]
+        for bad_model in bad_models:
+            if bad_model in copied:
+                copied.pop(bad_model)
+
+        print(f"[INFO] Dropped {len(bad_models)} incompatible models for '{embedding_type}': {', '.join(bad_models)}")
+
     return copied
+
