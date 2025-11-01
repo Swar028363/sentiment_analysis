@@ -10,7 +10,6 @@ import matplotlib.pyplot as plt
 
 from sklearn.model_selection import StratifiedKFold, KFold, train_test_split, cross_validate
 from sklearn.preprocessing import label_binarize
-from sklearn.base import clone
 from sklearn.metrics import *
 
 from .models_and_metrics import METRIC_FUNCTIONS
@@ -137,40 +136,14 @@ def train_and_eval_models(
             results.append(model_data)
 
     df = pd.DataFrame(results)
-    if 'Test_F1-Score' in df.columns:
-        df = df.sort_values(by='Test_F1-Score', ascending=False)
+    if 'Test_F1' in df.columns:
+        df = df.sort_values(by='Test_F1', ascending=False)
     print("\nEvaluation Complete.")
 
     return models, df
 
 
-def combine_results(dfs, names):
-    """
-    Combine multiple model result DataFrames and tag each with embedding name.
-    """
-    combined = []
-    for df, name in zip(dfs, names):
-        df = df.copy()
-        df["Embedding"] = name
-        df["Model"] = df["Model"].astype(str) + f"{name}"
-        combined.append(df)
-    return pd.concat(combined, ignore_index=True)
 
-def combine_model_dicts(model_dicts, names=None, prefix=True):
-    combined = {}
-
-    for i, models in enumerate(model_dicts):
-        embed_name = names[i] if names and i < len(names) else f"Set{i+1}"
-
-        for model_name, model_obj in models.items():
-            if prefix:
-                new_name = f"{embed_name}{model_name}"
-            else:
-                new_name = f"{model_name}{embed_name}"
-
-            combined[new_name] = clone(model_obj)
-
-    return combined
 
 
 def find_best_models(df, scoring_func=None, top_n=5):
@@ -231,34 +204,7 @@ def find_best_models(df, scoring_func=None, top_n=5):
     return ranked.head(top_n)
 
 
-def plot_model_performance(df, metric="Overall_Score", fig_size=(14, 14), save_fig_path=""):
-    df_plot = df.sort_values(metric, ascending=False)
 
-    plt.figure(figsize=fig_size)
-    ax = sns.barplot(
-        data=df_plot,
-        x="Model",
-        y=metric,
-        hue="Embedding",
-    )
-    ax.set_xlabel(metric)
-    plt.xticks(rotation=-45)
-    ax.set_ylabel("Model")
-
-    ax.set_title(f"Model Performance by {metric}", fontsize=16, fontweight="bold", pad=15)
-
-    plt.legend(
-        title="Embedding",
-        bbox_to_anchor=(1.02, 1),
-    )
-    
-    for container in ax.containers:
-         ax.bar_label(container, fmt="%.3f")
-        
-    if save_fig_path != "":
-        plt.savefig(save_fig_path)
-        
-    plt.show()
 
 
 

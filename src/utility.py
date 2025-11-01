@@ -3,6 +3,11 @@ import pickle
 
 import numpy as np
 import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt 
+
+from copy import deepcopy
+
 
 def load_data_csv(path: str) -> pd.DataFrame:
     """Load CSV from interim data folder."""
@@ -22,6 +27,63 @@ def load_pickle(path: str):
     with open(path, "rb") as f:
         return pickle.load(f)
 
+def combine_results(dfs, names):
+    """
+    Combine multiple model result DataFrames and tag each with embedding name.
+    """
+    combined = []
+    for df, name in zip(dfs, names):
+        df = df.copy()
+        df["Embedding"] = name
+        df["Model"] = df["Model"].astype(str) + f"_{name}"
+        combined.append(df)
+    return pd.concat(combined, ignore_index=True)
+
+def combine_model_dicts(model_dicts, names=None, prefix=False):
+    combined = {}
+
+    for i, models in enumerate(model_dicts):
+        embed_name = names[i] if names and i < len(names) else f"Set{i+1}"
+
+        for model_name, model_obj in models.items():
+            if prefix:
+                new_name = f"{embed_name}_{model_name}"
+            else:
+                new_name = f"{model_name}_{embed_name}"
+
+            combined[new_name] = deepcopy(model_obj)
+
+    return combined
+
+
+def plot_model_performance(df, metric="Overall_Score", fig_size=(14, 14), save_fig_path=""):
+    df_plot = df.sort_values(metric, ascending=False)
+
+    plt.figure(figsize=fig_size)
+    ax = sns.barplot(
+        data=df_plot,
+        x="Model",
+        y=metric,
+        hue="Embedding",
+    )
+    ax.set_xlabel(metric)
+    plt.xticks(rotation=-45)
+    ax.set_ylabel("Model")
+
+    ax.set_title(f"Model Performance by {metric}", fontsize=16, fontweight="bold", pad=15)
+
+    plt.legend(
+        title="Embedding",
+        bbox_to_anchor=(1.02, 1),
+    )
+    
+    for container in ax.containers:
+         ax.bar_label(container, fmt="%.3f")
+        
+    if save_fig_path != "":
+        plt.savefig(save_fig_path)
+        
+    plt.show()
 
 def fix_config_types(d):
     """
